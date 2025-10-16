@@ -12,16 +12,19 @@ echo -e "${CIANO}🔍 Verificando dependências...${RESET}"
 if ! command -v docker &> /dev/null; then
   echo -e "${AMARELO}⚠️ Docker não encontrado. Instalando...${RESET}"
   sudo apt update
-  sudo apt install -y docker.io
+  sudo curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
   sudo systemctl enable --now docker
-else
+  else
   echo -e "${VERDE}✅ Docker já está instalado.${RESET}"
 fi
 
 # Verifica e instala Docker Compose
 if ! command -v docker-compose &> /dev/null; then
   echo -e "${AMARELO}⚠️ Docker Compose não encontrado. Instalando...${RESET}"
-  sudo apt install -y docker-compose
+  mkdir -p ~/.docker/cli-plugins/
+  curl -SL https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+  chmod +x ~/.docker/cli-plugins/docker-compose
+  docker compose version
 else
   echo -e "${VERDE}✅ Docker Compose já está instalado.${RESET}"
 fi
