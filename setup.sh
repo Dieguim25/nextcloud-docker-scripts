@@ -138,4 +138,18 @@ docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewPr
 echo -e "${CIANO}🖼️ Gerando miniaturas iniciais...${RESET}"
 docker exec -u www-data nextcloud-app php occ preview:generate-all -vvv
 
+echo -e "${CIANO}📅 Configurando agendamentos via cron...${RESET}"
+
+# Comandos de agendamento
+CRON_BACKUP="0 2 * * * /var/scripts/nextcloud_docker/backup.sh >> /var/log/nextcloud_backup.log 2>&1"
+CRON_UPDATE="0 3 * * 0 /var/scripts/nextcloud_docker/update.sh >> /var/log/nextcloud_update.log 2>&1"
+
+# Adiciona ao crontab se ainda não estiver presente
+(crontab -l 2>/dev/null | grep -qF "$CRON_BACKUP") || (crontab -l 2>/dev/null; echo "$CRON_BACKUP") | crontab -
+(crontab -l 2>/dev/null | grep -qF "$CRON_UPDATE") || (crontab -l 2>/dev/null; echo "$CRON_UPDATE") | crontab -
+
+echo -e "${VERDE}✅ Agendamentos adicionados ao crontab:${RESET}"
+echo -e "${VERDE}🕒 Backup diário às 2h${RESET}"
+echo -e "${VERDE}🕒 Atualização semanal aos domingos às 3h${RESET}"
+
 echo -e "${VERDE}✅ Setup concluído com sucesso!${RESET}"
