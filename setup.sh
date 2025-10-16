@@ -6,6 +6,25 @@ AMARELO='\033[1;33m'
 VERMELHO='\033[0;31m'
 CIANO='\033[0;36m'
 RESET='\033[0m'
+echo -e "${CIANO}🔍 Verificando dependências...${RESET}"
+
+# Verifica e instala Docker
+if ! command -v docker &> /dev/null; then
+  echo -e "${AMARELO}⚠️ Docker não encontrado. Instalando...${RESET}"
+  sudo apt update
+  sudo apt install -y docker.io
+  sudo systemctl enable --now docker
+else
+  echo -e "${VERDE}✅ Docker já está instalado.${RESET}"
+fi
+
+# Verifica e instala Docker Compose
+if ! command -v docker-compose &> /dev/null; then
+  echo -e "${AMARELO}⚠️ Docker Compose não encontrado. Instalando...${RESET}"
+  sudo apt install -y docker-compose
+else
+  echo -e "${VERDE}✅ Docker Compose já está instalado.${RESET}"
+fi
 
 # Verifica se o whiptail está instalado
 if ! command -v whiptail &> /dev/null; then
@@ -80,7 +99,7 @@ while true; do
 done
 
 while true; do
-  ADMIN_PASS=$(whiptail --passwordbox "Digite a senha para ${ADMIN_USER}:" 10 60 --title "Senha Admin" 3>&1 1>&2 2>&3)
+  ADMIN_PASS=$(whiptail --inputbox "Digite a senha para ${ADMIN_USER}:" 10 60 --title "Senha Admin" 3>&1 1>&2 2>&3)
 
   # Mostra a senha digitada e pede confirmação
   if (whiptail --yesno "Você digitou a senha:\n\n${ADMIN_PASS}\n\nDeseja continuar com essa senha?" 12 60 --title "Confirmar Senha" 3>&1 1>&2 2>&3); then
