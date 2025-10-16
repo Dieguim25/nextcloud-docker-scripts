@@ -20,3 +20,16 @@ Execute o seguinte comando no terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dieguim25/nextcloud-docker-scripts/main/bootstrap_nextcloud.sh | bash
+
+Este comando irá:
+
+Criar o diretório /var/scripts/nextcloud_docker
+
+Baixar os scripts setup.sh, backup.sh e update.sh
+
+Ajustar permissões de execução
+
+Iniciar o processo de instalação interativa
+
+📣 Notificações
+Todos os scripts enviam notificações internas para os membros do grupo adm no Nextcloud, mantendo os administradores informados sobre backups e atualizações.
