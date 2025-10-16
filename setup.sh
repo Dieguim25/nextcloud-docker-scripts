@@ -7,104 +7,116 @@ VERMELHO='\033[0;31m'
 CIANO='\033[0;36m'
 RESET='\033[0m'
 
-echo -e "${CIANO}📁 Criando estrutura do projeto...${RESET}"
+# Verifica se o whiptail está instalado
+if ! command -v whiptail &> /dev/null; then
+  echo -e "${AMARELO}📦 Instalando whiptail...${RESET}"
+  sudo apt update && sudo apt install -y whiptail
+fi
 
-mkdir -p nextcloud-docker
-cd nextcloud-docker
+USE_EXISTING_ENV=false
+if [ -f .env ]; then
+  echo -e "${AMARELO}⚠️ Arquivo .env detectado.${RESET}"
+  if whiptail --yesno "Deseja usar os dados existentes do arquivo .env?" 12 60 --title "Usar .env existente" 3>&1 1>&2 2>&3; then
+    source .env
+    USE_EXISTING_ENV=true
+  else
+    rm .env
+  fi
+fi
 
-# Cria arquivos
-echo -e "${CIANO}📄 Gerando arquivos...${RESET}"
+if [ "$USE_EXISTING_ENV" = false ]; then
+  MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)
+  MYSQL_PASSWORD=$(openssl rand -hex 16)
 
-# Dockerfile
-cat <<'EOF' > Dockerfile
-FROM nextcloud:latest
-RUN apt-get update && \
-    apt-get install -y ffmpeg imagemagick ghostscript && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+  while true; do
+    USER_DATA_PATH=$(whiptail --inputbox "Digite o caminho para os dados dos usuários:" 10 60 "/mnt/ncdata" --title "Caminho dos Dados" 3>&1 1>&2 2>&3)
+    if (whiptail --yesno "Você digitou: ${USER_DATA_PATH}\nEstá correto?" 10 60 --title "Confirmar Caminho" 3>&1 1>&2 2>&3); then
+      break
+    fi
+  done
+
+  echo -e "${CIANO}📝 Criando .env...${RESET}"
+  cat <<EOF > .env
+MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+MYSQL_PASSWORD=$MYSQL_PASSWORD
+USER_DATA_PATH=$USER_DATA_PATH
 EOF
+fi
 
-# docker-compose.yml
-cat <<'EOF' > docker-compose.yml
-version: '3.8'
-services:
-  db:
-    image: mariadb:11
-    container_name: nextcloud-db
-    restart: always
-    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: nextcloud
-      MYSQL_USER: nextcloud
-      TZ: America/Sao_Paulo
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  redis:
-    image: redis:7
-    container_name: nextcloud-redis
-    restart: always
-    volumes:
-      - redis_data:/data
-  app:
-    build: .
-    container_name: nextcloud-app
-    restart: always
-    ports:
-      - 8080:80
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    environment:
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: nextcloud
-      MYSQL_USER: nextcloud
-      MYSQL_HOST: db
-      REDIS_HOST: redis
-      TZ: America/Sao_Paulo
-      DEFAULT_PHONE_REGION: BR
-      NEXTCLOUD_MAINTENANCE_WINDOW_START: 7
-      PHP_MEMORY_LIMIT: 1024M
-      PHP_UPLOAD_LIMIT: 15360M
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
-    volumes:
-      - nextcloud_config:/var/www/html/config
-      - ${USER_DATA_PATH}:/var/www/html/data
-volumes:
-  db_data:
-  redis_data:
-  nextcloud_config:
-EOF
+# Verifica se a pasta contém dados
+if [ "$(ls -A "$USER_DATA_PATH" 2>/dev/null)" ]; then
+  echo -e "${AMARELO}⚠️ A pasta $USER_DATA_PATH contém arquivos.${RESET}"
+  if whiptail --yesno "Deseja continuar usando essa pasta?" 12 60 --title "Dados existentes" 3>&1 1>&2 2>&3; then
+    if whiptail --yesno "Deseja fazer um backup da pasta antes de continuar?" 10 60 --title "Backup recomendado" 3>&1 1>&2 2>&3; then
+      BACKUP_PATH="${USER_DATA_PATH}_backup_$(date +%Y%m%d_%H%M%S)"
+      sudo cp -r "$USER_DATA_PATH" "$BACKUP_PATH"
+      echo -e "${VERDE}📦 Backup criado em: $BACKUP_PATH${RESET}"
+    fi
+  else
+    echo -e "${VERMELHO}🛑 Instalação cancelada.${RESET}"
+    exit 1
+  fi
+else
+  sudo mkdir -p "$USER_DATA_PATH"
+  sudo chown -R 33:33 "$USER_DATA_PATH"
+fi
 
-# Adiciona os scripts
-cp /caminho/do/seu/setup.sh .
-cp /caminho/do/seu/backup.sh .
-cp /caminho/do/seu/update.sh .
+# Restauração de banco
+LATEST_DB_BACKUP=$(ls "$USER_DATA_PATH"/db_backup_*.sql 2>/dev/null | sort | tail -n 1)
+if [ -f "$LATEST_DB_BACKUP" ]; then
+  echo -e "${AMARELO}🗄️ Backup de banco detectado: $(basename "$LATEST_DB_BACKUP")${RESET}"
+  if whiptail --yesno "Deseja restaurar esse backup do banco de dados?" 10 60 --title "Restaurar banco" 3>&1 1>&2 2>&3; then
+    docker exec -i nextcloud-db sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' < "$LATEST_DB_BACKUP"
+    echo -e "${VERDE}✅ Banco restaurado.${RESET}"
+  fi
+fi
 
-# README.md
-cat <<'EOF' > README.md
-# 🚀 Nextcloud com Docker — Setup Automatizado
-Este projeto configura um ambiente completo do Nextcloud com Docker, incluindo:
-- Pré-visualização de imagens e vídeos
-- Backup automático com notificação
-- Atualização automática com verificação de versão
-- Notificações internas para o grupo `adm`
-...
-EOF
+# Usuário admin
+while true; do
+  ADMIN_USER=$(whiptail --inputbox "Nome do usuário administrador:" 10 60 "admin" --title "Usuário Admin" 3>&1 1>&2 2>&3)
+  if (whiptail --yesno "Você digitou: ${ADMIN_USER}\nEstá correto?" 10 60 --title "Confirmar Usuário" 3>&1 1>&2 2>&3); then
+    break
+  fi
+done
 
-# Compacta
-cd ..
-zip -r nextcloud-docker.zip nextcloud-docker
+while true; do
+  ADMIN_PASS=$(whiptail --passwordbox "Senha para ${ADMIN_USER}:" 10 60 --title "Senha Admin" 3>&1 1>&2 2>&3)
+  if (whiptail --yesno "Deseja continuar com essa senha?" 10 60 --title "Confirmar Senha" 3>&1 1>&2 2>&3); then
+    break
+  fi
+done
 
-echo -e "${VERDE}✅ Projeto empacotado em nextcloud-docker.zip${RESET}"
+export OC_PASS="$ADMIN_PASS"
+
+echo -e "${CIANO}🐳 Subindo containers...${RESET}"
+docker-compose build
+docker-compose up -d
+
+echo -e "${CIANO}⏳ Aguardando Nextcloud iniciar...${RESET}"
+sleep 45
+
+echo -e "${CIANO}👤 Criando usuário administrador...${RESET}"
+docker exec -u www-data nextcloud-app php occ user:add --password-from-env "$ADMIN_USER"
+docker exec -u www-data nextcloud-app php occ group:add adm
+docker exec -u www-data nextcloud-app php occ group:adduser adm "$ADMIN_USER"
+unset OC_PASS
+
+echo -e "${CIANO}📦 Instalando apps de preview...${RESET}"
+docker exec -u www-data nextcloud-app php occ app:install previewgenerator
+docker exec -u www-data nextcloud-app php occ app:enable previewgenerator
+docker exec -u www-data nextcloud-app php occ app:install video_player
+docker exec -u www-data nextcloud-app php occ app:enable video_player
+
+echo -e "${CIANO}⚙️ Configurando previews...${RESET}"
+docker exec -u www-data nextcloud-app php occ config:system:set preview_max_x --value="2048"
+docker exec -u www-data nextcloud-app php occ config:system:set preview_max_y --value="2048"
+docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewProviders 0 --value="OC\\Preview\\Image"
+docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewProviders 1 --value="OC\\Preview\\Movie"
+docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewProviders 2 --value="OC\\Preview\\MP4"
+docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewProviders 3 --value="OC\\Preview\\TXT"
+docker exec -u www-data nextcloud-app php occ config:system:set enabledPreviewProviders 4 --value="OC\\Preview\\MarkDown"
+
+echo -e "${CIANO}🖼️ Gerando miniaturas iniciais...${RESET}"
+docker exec -u www-data nextcloud-app php occ preview:generate-all -vvv
+
+echo -e "${VERDE}✅ Setup concluído com sucesso!${RESET}"
