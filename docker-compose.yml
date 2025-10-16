@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.6
+    container_name: nextcloud-db
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      TZ: America/Sao_Paulo
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: nextcloud-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    container_name: nextcloud-app
+    restart: always
+    ports:
+      - 8080:80
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_HOST: db
+      REDIS_HOST: redis
+      TZ: America/Sao_Paulo
+      DEFAULT_PHONE_REGION: BR
+      NEXTCLOUD_MAINTENANCE_WINDOW_START: 7
+      PHP_MEMORY_LIMIT: 1024M
+      PHP_UPLOAD_LIMIT: 15360M
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    volumes:
+      - nextcloud_config:/var/www/html/config
+      - ${USER_DATA_PATH}:/var/www/html/data
+
+volumes:
+  db_data:
+  redis_data:
+  nextcloud_config:
