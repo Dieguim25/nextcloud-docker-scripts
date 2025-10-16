@@ -80,11 +80,14 @@ while true; do
 done
 
 while true; do
-  ADMIN_PASS=$(whiptail --passwordbox "Senha para ${ADMIN_USER}:" 10 60 --title "Senha Admin" 3>&1 1>&2 2>&3)
-  if (whiptail --yesno "Deseja continuar com essa senha?" 10 60 --title "Confirmar Senha" 3>&1 1>&2 2>&3); then
+  ADMIN_PASS=$(whiptail --passwordbox "Digite a senha para ${ADMIN_USER}:" 10 60 --title "Senha Admin" 3>&1 1>&2 2>&3)
+
+  # Mostra a senha digitada e pede confirmação
+  if (whiptail --yesno "Você digitou a senha:\n\n${ADMIN_PASS}\n\nDeseja continuar com essa senha?" 12 60 --title "Confirmar Senha" 3>&1 1>&2 2>&3); then
     break
   fi
 done
+
 
 export OC_PASS="$ADMIN_PASS"
 
