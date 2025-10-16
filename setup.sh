@@ -25,6 +25,12 @@ if ! command -v docker-compose &> /dev/null; then
 else
   echo -e "${VERDE}✅ Docker Compose já está instalado.${RESET}"
 fi
+# Define comando Compose compatível
+if command -v docker compose &> /dev/null; then
+  COMPOSE_CMD="docker compose"
+else
+  COMPOSE_CMD="docker-compose"
+fi
 
 # Verifica se o whiptail está instalado
 if ! command -v whiptail &> /dev/null; then
