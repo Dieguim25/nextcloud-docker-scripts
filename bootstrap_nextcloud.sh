@@ -22,7 +22,7 @@ fi
 
 cd "$DESTINO" || exit 1
 
-SCRIPTS=("setup.sh" "backup.sh" "update.sh")
+SCRIPTS=("setup.sh" "backup.sh" "update.sh" "docker-compose.yml")
 
 for script in "${SCRIPTS[@]}"; do
   echo -e "${CIANO}⬇️ Baixando $script...${RESET}"
