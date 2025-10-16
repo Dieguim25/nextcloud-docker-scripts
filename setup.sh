@@ -101,6 +101,25 @@ docker exec -u www-data nextcloud-app php occ group:add adm
 docker exec -u www-data nextcloud-app php occ group:adduser adm "$ADMIN_USER"
 unset OC_PASS
 
+# Escolha do timezone
+TIMEZONE=$(whiptail --title "Fuso horário do servidor Nextcloud" --menu "Escolha o timezone:" 15 60 6 \
+"America/Sao_Paulo" "Brasil (padrão)" \
+"America/Fortaleza" "Nordeste" \
+"America/Manaus" "Amazonas" \
+"America/Recife" "Pernambuco" \
+"America/Belem" "Pará" \
+"America/Cuiaba" "Centro-Oeste" \
+3>&1 1>&2 2>&3)
+
+if [ -z "$TIMEZONE" ]; then
+  TIMEZONE="America/Sao_Paulo"
+  echo -e "${AMARELO}⚠️ Nenhum timezone escolhido. Usando padrão: $TIMEZONE${RESET}"
+else
+  echo -e "${VERDE}🌍 Timezone selecionado: $TIMEZONE${RESET}"
+fi
+
+docker exec -u www-data nextcloud-app php occ config:system:set default_timezone --value="$TIMEZONE"
+
 echo -e "${CIANO}📦 Instalando apps de preview...${RESET}"
 docker exec -u www-data nextcloud-app php occ app:install previewgenerator
 docker exec -u www-data nextcloud-app php occ app:enable previewgenerator
